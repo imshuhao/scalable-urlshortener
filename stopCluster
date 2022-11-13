@@ -12,7 +12,7 @@ MASTER="$1"
 shift
 
 while (( "$#" )); do
-	ssh student@$1 "docker container stop cassandra-node"
-	ssh student@$1 "docker container rm cassandra-node"
+	ssh `whoami`@$1 "docker container stop cassandra-node"
+	ssh `whoami`@$1 "docker container rm cassandra-node"
 	shift
 done
