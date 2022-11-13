@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<head>
+    <style> 
+    div {
+        padding-right: 30px;
+        padding-bottom: 50px;
+        padding-left: 80px;
+        display: grid;
+        justify-content: center;
+    }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+    <script >
+        $(document).on('submit', '.getForm', function(e) {
+            let short = $("#shortval").val();
+            window.location.href = short;
+            e.preventDefault();
+        });
+        $(document).on('submit', '.putForm', function(e) {
+            $.ajax({
+                url: '/?'+ $(this).serialize(),
+                type: "PUT",
+                data: $(this).serialize(),
+                success: function(html) {
+                    $('#put_result').text("success");
+                },
+                error: function(res) {
+                    $('#put_result').text(res.statusText);
+                }, 
+            });
+            e.preventDefault();
+        });
+    </script>
+</head>
+<html>
+    <body>
+        <center><h1>Redirect Me</h1></center>
+        <div>
+            <h2>GET Request</h2>
+            <form class="getForm">
+                <input id="shortval" name="shortval" type="text" size="30"></input>
+                <Button type="submit">Jump</Button>
+            </form><br />
+            <h2>PUT Request</h2>
+            <form class="putForm">
+                <label for="short">Short</label>
+                <input id="short" name="short" type="text" size="50" style="margin-bottom: 10px"></input>
+                <br><label for="long">Long</label>
+                <input id="long" name="long" type="text" size="100"></input>
+                <Button type="submit">Put</Button>
+            </form>
+            <textarea id="put_result" rows="4" cols="80" readonly></textarea>
+        </div>
+    </body>
+</html>

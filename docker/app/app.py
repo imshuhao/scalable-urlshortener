@@ -1,97 +1,70 @@
 #!/usr/bin/python
-# https://pypi.org/project/cassandra-driver/
-# https://docs.datastax.com/en/developer/python-driver/3.24/getting_started/
 from cassandra.cluster import Cluster
 from redis import Redis, RedisError
-import time
-from flask import Flask, request
+from flask import Flask, request, redirect, render_template
 import os
-import socket
+import json
 
-redis = Redis(host="redis", db=0, socket_connect_timeout=2, socket_timeout=2)
+redis_host = os.environ['REDIS_HOST']
+cassandra_cluster = [h.strip() for h in os.environ['CASSANDRA_CLUSTER'].split(',')]
 
-'''
-profile = ExecutionProfile(
-	load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']),
-	retry_policy=DowngradingConsistencyRetryPolicy(),
-	consistency_level=ConsistencyLevel.LOCAL_QUORUM,
-	serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL,
-	request_timeout=15,
-	row_factory=tuple_factory
-)
-# Can pass in execution profile 
-cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
-'''
 
-cluster = Cluster(['IP1', 'IP2'])
-# session = cluster.connect()
-session = cluster.connect('cassandratutorial')
+redis = Redis(host=redis_host, db=0, socket_connect_timeout=2, socket_timeout=2)
 
-# session.set_keyspace('users')
-# or you can do this instead
-# session.execute('USE users')
+cluster = Cluster(cassandra_cluster)
+session = cluster.connect('urlmap')
 
-def timeCassandra(yearStart, yearEnd):
-	userids = [ "userid"+str(i) for i in range(10) ]
-	start_time = time.time()
-	count = 0
-	
-	insert_statement = """
-	INSERT INTO calendar (userid, year, month, day, event)
-	VALUES (%s, %s, %s, %s, %s);
-	"""
-	for userid in userids:
-		for year in range(yearStart,yearEnd):
-			for month in range(1,13):
-				for day in range(1,32):
-					event = "{} {} {} {}".format(userid, year, month, day)
-					session.execute(insert_statement, (userid, year, month, day, event))
-					count = count + 1
-	
-	end_time = time.time()
-	report = "Cassandra: {} inserts in {} seconds".format(count, (end_time - start_time))
-	print(report)
-	return report
+insert_statement = """
+INSERT INTO urlmap (short, long)
+VALUES (%s, %s);
+"""
 
-def timeRedis(yearStart, yearEnd):
-	userids = [ "userid"+str(i) for i in range(10) ]
-	start_time = time.time()
-	count = 0
-	for userid in userids:
-		for year in range(yearStart,yearEnd):
-			for month in range(1,13):
-				for day in range(1,32):
-					event = "{} {} {} {}".format(userid, year, month, day)
-					key = "{} {} {} {}".format(userid, year, month, day)
-					redis.set(key, event)
-					count = count + 1
-	end_time = time.time()
-	report = "Redis: {} inserts in {} seconds".format(count, (end_time - start_time))
-	print(report)
-	return report
+select_statement = """
+SELECT long FROM urlmap
+WHERE short = %s;
+"""
 
 app = Flask(__name__)
 
-@app.route("/", methods=['GET', 'POST'])
+@app.route("/", methods=['GET'])
 def hello():
-	html = """
-<form>
-	<input type="text" name="yearStart" />
-	<input type="text" name="yearEnd" />
-	<input type="submit" />
-</form>
-"""
-	html=""
-	args = request.args
-	if 'yearStart' in args and 'yearEnd' in args:
-		yearStart = int(request.args['yearStart'])
-		yearEnd = int(request.args['yearEnd'])
-		report1=timeCassandra(yearStart, yearEnd)
-		report2=timeRedis(yearStart, yearEnd)
-		html="Execution Results:\n {}\n{}\n".format(report1, report2)
+	return render_template('index.html')
 
-	return html
+@app.route("/<shortResource>", methods=['GET'])
+def getResource(shortResource):
+	try:
+		longResource = redis.get(shortResource)
+	except RedisError:
+		return "Error: cannot connect to Redis", 500
+	if not longResource:
+		try:
+			longResource = session.execute(select_statement, [shortResource]).one().long
+		except AttributeError:
+			pass
+		except:
+			return "Error: cannot connect to Cassandra", 500
+	if longResource:
+		redis.set(shortResource, longResource)
+		return redirect(longResource, code=307)
+	return "Not Found", 404
+
+@app.route("/", methods=['PUT'])
+def putResource():
+	longResource = request.args.get('long')
+	shortResource = request.args.get('short')
+	if not (longResource and shortResource):
+		return "Bad Request (empty field)", 400
+	if "://" not in longResource:
+		return "Bad Request (not a URL)", 400
+	try:
+		session.execute(insert_statement, [shortResource, longResource])
+	except:
+		return "Error: cannot connect to Cassandra", 500
+	try:
+		redis.delete(shortResource)
+	except RedisError:
+		return "Error: cannot connect to Redis", 500
+	return "Success", 201
 
 if __name__ == "__main__":
 	app.run(host='0.0.0.0', port=80)
-

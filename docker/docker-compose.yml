@@ -2,7 +2,8 @@ version: "3"
 services:
   web:
     # replace username/repo:tag with your name and image details
-    image: a2:latest
+    image: web:latest
+    container_name: web
     deploy:
       replicas: 1
       restart_policy:
@@ -13,6 +14,11 @@ services:
       #     memory: 50M
     ports:
       - "4000:80"
+    depends_on:
+      - master
+    environment:
+      - REDIS_HOST=redis-master
+      - CASSANDRA_CLUSTER=cassandra-node
     networks:
       - a2net
 
@@ -28,13 +34,13 @@ services:
     networks:
       - a2net
 
-  redis-master:
+  master:
     image: redis
-    container_name: redis_master
+    container_name: redis-master
     ports:
       - "6379:6379"
     volumes:
-      - "/home/student/cassandraRedisDocker/docker/data:/data"
+      - "/home/student/redis:/data"
     deploy:
       placement:
         constraints: [node.role == manager]
@@ -44,16 +50,16 @@ services:
 
   slave:
     image: redis
-    container_name: redis_slave
+    container_name: redis-slave
     ports:
       - "6380:6379"
     deploy:
       replicas: 2
-    command: redis-server --slaveof redis_master 6379
+    command: redis-server --slaveof redis-master 6379
+    depends_on:
+      - master
     networks:
       - a2net
-    depends_on:
-      - redis-master
 
 networks:
   a2net:
