@@ -1,0 +1,59 @@
+version: "3"
+services:
+  web:
+    # replace username/repo:tag with your name and image details
+    image: a2:latest
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      # resources:
+      #   limits:
+      #     cpus: "0.1"
+      #     memory: 50M
+    ports:
+      - "4000:80"
+    networks:
+      - a2net
+
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - a2net
+
+  redis-master:
+    image: redis
+    container_name: redis_master
+    ports:
+      - "6379:6379"
+    volumes:
+      - "/home/student/cassandraRedisDocker/docker/data:/data"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    command: redis-server --appendonly yes
+    networks:
+      - a2net
+
+  slave:
+    image: redis
+    container_name: redis_slave
+    ports:
+      - "6380:6379"
+    deploy:
+      replicas: 2
+    command: redis-server --slaveof redis_master 6379
+    networks:
+      - a2net
+    depends_on:
+      - redis-master
+
+networks:
+  a2net:

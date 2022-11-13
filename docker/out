@@ -1,0 +1,3 @@
+Execution Results:
+ Cassandra: 26040 inserts in 19.5954189301 seconds
+Redis: 26040 inserts in 2.85374808311 seconds

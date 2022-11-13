@@ -1,0 +1,135 @@
+# Find your hosts (vs guests=VM)
+# Bring up terminals T1, T2, T3
+# T1: 
+ssh UTORID@dh20XXpcXX.utm.utoronto.ca
+ssh -p 2222 student@localhost
+wget https://axiom.utm.utoronto.ca/~csc409/20f/assignments/a2/cassandraRedisDocker.zip
+unzip cassandraRedisDocker.zip
+cd cassandraRedisDocker
+
+##############################################################################
+# BEGIN Cassandra TERMINAL: T2
+ssh UTORID@dh20XXpcXX.utm.utoronto.ca
+ssh -p 2222 student@localhost
+cd cassandraRedisDocker
+
+# let IP1, IP2 and IP3 be the 3 IPs of your guests=VM, (not the host)
+
+./startCluster IP1 IP2 IP3 # should be like 10.11.12.XXX
+
+# visit https://axiom.utm.utoronto.ca/~csc409/20f/lectures/cassandra/
+docker exec -it cassandra-node bash 
+nodetool status # should see all three nodes with UN status
+
+cqlsh
+# Create the following keyspace and table in the keyspace
+CREATE KEYSPACE cassandraTutorial
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 2};
+USE cassandraTutorial;
+CREATE TABLE calendar (
+	userid text,
+	year int,
+	month int,
+	day int,
+	event text,
+	PRIMARY KEY (userid, year, month, day)
+);
+# You can check the status of the scripts here by 
+select * from calendar;
+
+# If you want to restart, just
+DROP TABLE calendar;
+CREATE TABLE calendar ( userid text, year int, month int, day int, event text, PRIMARY KEY (userid, year, month, day));
+# END Cassandra 
+##############################################################################
+
+##############################################################################
+# BEGIN Docker TERMINAL: T1 
+docker login # provide credentials 
+
+# Assuming you are on IP1
+# Make sure there is no other swarm running, if so, stop it
+# docker swarm ls
+# docker swarm rm ID
+
+# Join a new swarm
+docker swarm leave --force
+docker swarm init --advertise-addr IP1
+# Copy the join line and paste it below...
+
+ssh IP2 'docker swarm leave --force'
+ssh IP2 'docker swarm join --token .... IP1:2377'
+
+ssh IP3 'docker swarm leave --force'
+ssh IP3 'docker swarm join --token .... IP1:2377'
+
+cd ~/cassandraRedisDocker/docker
+# Modify docker-compose.yml so that the web service uses
+# your image DOCKERUSER/cassandra_redis_test:v1
+
+# Edit app/app.py, modify 
+# cluster = Cluster(['IP1', 'IP2']) # change this to point to the IPs of your cluster
+
+
+# Building and pushing the image. DO THIS EACH TIME YOU CHANGE THE APP
+cd ~/cassandraRedisDocker/docker
+docker build -t DOCKERUSER/cassandra_redis_test:v1 .
+docker push DOCKERUSER/cassandra_redis_test:v1 # Must do this since cluster will draw from the public repo
+
+# Deploying the stack
+cd ~/cassandraRedisDocker/docker
+docker stack deploy -c docker-compose.yml cassandraRedisExploration
+docker stack ls
+docker stack ps cassandraRedisExploration
+docker container ls
+
+# TESTING THE APP
+wget -O out 'http://127.0.0.1:4000/?yearStart=2020&yearEnd=2021' # take a look at out
+
+# looking at the logs
+docker service logs cassandraRedisExploration_web
+docker logs CONTAINERID
+
+# Taking down the stack
+docker stack rm cassandraRedisExploration
+
+#NOTE: Debugging
+# If you want to debug the Flask part of the application alone in app.py
+# comment out the lines connecting to the redis and cassandra, then 
+# docker build . 
+# docker run -it -p 4000:80 IMAGEID
+# In another terminal wget -O out 'http://127.0.0.1:4000/?yearStart=2020&yearEnd=2022'
+# END Docker 
+##############################################################################
+
+##############################################################################
+# BEGIN REDIS TERMINAL: T3
+ssh UTORID@dh20XXpcXX.utm.utoronto.ca
+ssh -p 2222 student@localhost
+# This runs while the stack is running!!!! You will have to 
+# redo the below each time you deploy the stack.
+
+docker container ps # find id of redis container
+docker exec -it CONTAINERID bash
+redis-cli
+keys "*userid*"
+get "userid99 2020 10 15"
+# END REDIS 
+##############################################################################
+
+##############################################################################
+# BEGIN CLEANUP
+docker stack rm cassandraRedisExploration
+cd ~/cassandraRedisDocker
+./stopCluster IP1 IP2 IP3 # remember, these are guest IP (10.11.12.XXX)
+# END CLEANUP
+##############################################################################
+
+##############################################################################
+# BEGIN REFERENCES
+https://axiom.utm.utoronto.ca/~csc409/20f/lectures/docker/
+https://axiom.utm.utoronto.ca/~csc409/20f/lectures/redis/
+https://axiom.utm.utoronto.ca/~csc409/20f/lectures/cassandra/
+https://success.mirantis.com/article/troubleshooting-container-networking
+# END REFERENCES
+##############################################################################
