@@ -1,65 +1,89 @@
 version: "3"
 services:
   web:
-    # replace username/repo:tag with your name and image details
-    image: web:latest
+    #image: imshuhao/a2web:latest
+    image: test
     container_name: web
+    ports:
+      - "80:80"
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
-      # resources:
-      #   limits:
-      #     cpus: "0.1"
-      #     memory: 50M
-    ports:
-      - "4000:80"
-    depends_on:
-      - master
-    environment:
-      - REDIS_HOST=redis-master
-      - CASSANDRA_CLUSTER=cassandra-node
-    networks:
-      - a2net
-
-  visualizer:
-    image: dockersamples/visualizer:stable
-    ports:
-      - "8080:8080"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-    deploy:
       placement:
         constraints: [node.role == manager]
+    environment:
+      - REDIS_HOST=10.11.1.114
+      - CASSANDRA_CLUSTER=10.11.1.114,10.11.1.115,10.11.1.23
+    depends_on:
+      - master
     networks:
-      - a2net
+      - a2network
 
   master:
     image: redis
     container_name: redis-master
     ports:
       - "6379:6379"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
     volumes:
-      - "/home/student/redis:/data"
+      - /home/student/CSC409A2/redis:/data
+      - /home/student/redis/overrides.conf:/opt/bitnami/redis/mounted-etc/overrides.conf
+      # - /home/student/redis/overrides.conf:/overrides.conf
     deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 512M
       placement:
         constraints: [node.role == manager]
-    command: redis-server --appendonly yes
+    command: 
+      - bash
+      - -c
+      - redis-server /opt/bitnami/redis/mounted-etc/overrides.conf --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
     networks:
-      - a2net
+      - a2network
 
   slave:
     image: redis
     container_name: redis-slave
     ports:
-      - "6380:6379"
+      - 6380:6379
     deploy:
       replicas: 2
-    command: redis-server --slaveof redis-master 6379
+    command: 
+      - bash
+      - -c
+      - redis-server --slaveof master 6379 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
     depends_on:
       - master
     networks:
-      - a2net
+      - a2network
+
+  redis-sentinel:
+    image: 'bitnami/redis-sentinel:latest'
+    environment:
+      - REDIS_MASTER_HOST=10.11.1.114
+      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=50000
+      - REDIS_SENTINEL_FAILOVER_TIMEOUT=200000
+      - REDIS_SENTINEL_RESOLVE_HOSTNAMES=yes
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      - master
+      - slave
+    links:
+      - master:master
+    networks:
+      - a2network
 
 networks:
-  a2net:
+  a2network:

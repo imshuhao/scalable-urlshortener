@@ -6,13 +6,7 @@ if [ "$#" == "0" ]; then
 	exit 1
 fi
 
-docker container stop cassandra-node
-docker container rm cassandra-node
-MASTER="$1"
-shift
-
 while (( "$#" )); do
-	ssh `whoami`@$1 "docker container stop cassandra-node"
-	ssh `whoami`@$1 "docker container rm cassandra-node"
+	ssh student@$1 "docker container stop cassandra-node; docker container rm cassandra-node"
 	shift
 done
