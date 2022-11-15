@@ -1,8 +1,8 @@
-version: "3"
+version: "3.8"
 services:
   web:
     #image: imshuhao/a2web:latest
-    image: test
+    image: web
     container_name: web
     ports:
       - "80:80"
@@ -30,6 +30,7 @@ services:
     volumes:
       - /home/student/CSC409A2/redis:/data
       - /home/student/redis/overrides.conf:/opt/bitnami/redis/mounted-etc/overrides.conf
+      - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
       # - /home/student/redis/overrides.conf:/overrides.conf
     deploy:
       replicas: 1
@@ -37,13 +38,13 @@ services:
         condition: on-failure
       resources:
         limits:
-          memory: 512M
+          memory: 128M
       placement:
         constraints: [node.role == manager]
     command: 
       - bash
       - -c
-      - redis-server /opt/bitnami/redis/mounted-etc/overrides.conf --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
+      - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
     networks:
       - a2network
 
@@ -54,10 +55,17 @@ services:
       - 6380:6379
     deploy:
       replicas: 2
+      placement:
+        max_replicas_per_node: 1
+      resources:
+        limits:
+          memory: 128M
+    volumes:
+      - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
     command: 
       - bash
       - -c
-      - redis-server --slaveof master 6379 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
+      - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --slaveof master 6379 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
     depends_on:
       - master
     networks:

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 from cassandra.cluster import Cluster
 from redis import Redis, RedisError
 from flask import Flask, request, redirect, render_template
@@ -20,12 +20,12 @@ cluster = Cluster(cassandra_cluster)
 session = cluster.connect('urlmap')
 
 insert_statement = """
-INSERT INTO urlmap.dictionary (short, long)
+INSERT INTO urlmap (short, long)
 VALUES (%s, %s);
 """
 
 select_statement = """
-SELECT long FROM urlmap.dictionary
+SELECT long FROM urlmap
 WHERE short = %s;
 """
 
