@@ -1,49 +1,42 @@
 #!/usr/bin/python3
 from cassandra.cluster import Cluster
 from redis import Redis, RedisError
+from redis.sentinel import Sentinel
 from flask import Flask, request, redirect, render_template
 import os, sys
 import logging
 app = Flask(__name__)
-
 app.logger.addHandler(logging.StreamHandler(sys.stdout))
-app.logger.setLevel(logging.DEBUG)
 
-redis_host = os.environ['REDIS_HOST']
+
+app.logger.setLevel(int(os.environ['LOGGING_LEVEL']))
+
+redis_sentinel = [(s.strip(), 26379) for s in os.environ['REDIS_SENTINEL'].split(',')]
 cassandra_cluster = [h.strip() for h in os.environ['CASSANDRA_CLUSTER'].split(',')]
-
-
-redis = Redis(host=redis_host, db=0, socket_connect_timeout=2, socket_timeout=2)
+app.logger.debug(redis_sentinel)
 app.logger.debug(cassandra_cluster)
 
 cluster = Cluster(cassandra_cluster)
 session = cluster.connect('urlmap')
 
-insert_statement = """
-INSERT INTO urlmap (short, long)
-VALUES (%s, %s);
-"""
+sentinel = Sentinel(redis_sentinel, socket_timeout=2)
 
-select_statement = """
-SELECT long FROM urlmap
-WHERE short = %s;
-"""
-
+query = "SELECT long FROM urlmap WHERE short = %s;"
 
 @app.route("/", methods=['GET'])
-def hello():
+def index():
 	return render_template('index.html')
 
 @app.route("/<shortResource>", methods=['GET'])
 def getResource(shortResource):
 	longResource = None
 	try:
-		longResource = redis.get(shortResource)
+		longResource = sentinel.slave_for("mymaster", socket_timeout=2).get(shortResource)
 	except RedisError:
 		app.logger.debug("Error: cannot get value from Redis")
 	if not longResource:
 		try:
-			longResource = session.execute(select_statement, [shortResource]).one().long
+			longResource = session.execute(query, [shortResource]).one().long
 		except AttributeError:
 			pass
 		except Exception as e:
@@ -65,13 +58,10 @@ def putResource():
 	if "://" not in longResource:
 		return "Bad Request (not a URL)", 400
 	try:
-		session.execute(insert_statement, [shortResource, longResource])
-	except:
-		return "Error: cannot connect to Cassandra", 500
-	try:
-		redis.delete(shortResource)
+		sentinel.master_for("mymaster", socket_timeout=2).set(shortResource, longResource)
+		sentinel.master_for("mymaster", socket_timeout=2).rpush('queue', shortResource)
 	except RedisError:
-		app.logger.debug("Error: cannot delete value from Redis")
+		app.logger.debug("Error: cannot set or rpush value to Redis")
 	return "Success", 201
 
 if __name__ == "__main__":
