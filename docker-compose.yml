@@ -13,7 +13,25 @@ services:
       placement:
         constraints: [node.role == manager]
     environment:
-      - REDIS_HOST=10.11.1.114
+      - REDIS_HOST=10.11.1.114,10.11.1.115,10.11.1.23
+      - CASSANDRA_CLUSTER=10.11.1.114,10.11.1.115,10.11.1.23
+    depends_on:
+      - master
+    networks:
+      - a2network
+
+  writer:
+    #image: imshuhao/a2writer:latest
+    image: writer
+    container_name: writer
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == manager]
+    environment:
+      - REDIS_HOST=10.11.1.114,10.11.1.115,10.11.1.23
       - CASSANDRA_CLUSTER=10.11.1.114,10.11.1.115,10.11.1.23
     depends_on:
       - master
