@@ -2,45 +2,42 @@ version: "3.8"
 services:
   web:
     #image: imshuhao/a2web:latest
-    image: web
-    container_name: web
+    image: imshuhao/a2web:latest
     ports:
       - "80:80"
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
-      placement:
-        constraints: [node.role == manager]
+      # placement:
+      #   constraints: [node.role == manager]
     environment:
-      - REDIS_HOST=10.11.1.114,10.11.1.115,10.11.1.23
+      - REDIS_SENTINEL=redis-sentinel
       - CASSANDRA_CLUSTER=10.11.1.114,10.11.1.115,10.11.1.23
     depends_on:
-      - master
+      - redis
     networks:
       - a2network
 
   writer:
     #image: imshuhao/a2writer:latest
-    image: writer
-    container_name: writer
+    image: imshuhao/a2writer:latest
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
-      placement:
-        constraints: [node.role == manager]
+      # placement:
+      #   constraints: [node.role == manager]
     environment:
-      - REDIS_HOST=10.11.1.114,10.11.1.115,10.11.1.23
+      - REDIS_SENTINEL=redis-sentinel
       - CASSANDRA_CLUSTER=10.11.1.114,10.11.1.115,10.11.1.23
     depends_on:
-      - master
+      - redis
     networks:
       - a2network
 
-  master:
+  redis:
     image: redis
-    container_name: redis-master
     ports:
       - "6379:6379"
     environment:
@@ -68,13 +65,13 @@ services:
 
   slave:
     image: redis
-    container_name: redis-slave
     ports:
-      - 6380:6380
+      - 6379
     deploy:
       replicas: 2
       placement:
         max_replicas_per_node: 1
+        constraints: [node.role == worker]
       resources:
         limits:
           memory: 128M
@@ -82,38 +79,63 @@ services:
         condition: on-failure
     volumes:
       - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
-    command: 
-      - bash
-      - -c
-      - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --port 6380 --replica-announce-port 6380 --replicaof master 6379 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
+    # command: 
+    #   - bash
+    #   - -c
+    #   - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --replicaof redis 6379 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
+    command: |
+      sh -c '\
+      redis-server \
+      --slave-announce-ip $$(hostname -i) \
+      --port 6379 \
+      --slaveof redis 6379 \
+      --maxmemory-policy allkeys-random \
+      ';
     depends_on:
-      - master
+      - redis
     networks:
       - a2network
 
   redis-sentinel:
     image: 'bitnami/redis-sentinel:latest'
-    ports:
-      - 26379:26379
+    # ports:
+    #   - 26379:26379
     environment:
       - REDIS_MASTER_HOST=10.11.1.114
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=5000
+      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=10000
       - REDIS_SENTINEL_FAILOVER_TIMEOUT=20000
       - REDIS_SENTINEL_RESOLVE_HOSTNAMES=yes
+      - ALLOW_EMPTY_PASSWORD=yes
       # - REDIS_SENTINEL_ANNOUNCE_IP=10.11.1.114
-      - REDIS_SENTINEL_ANNOUNCE_PORT=6380
+    # volumes:
+    #   - 'redis-sentinel-volume:/bitnami'
+    # entrypoint: |
+    #   bash -c 'bash -s <<EOF
+    #   "/bin/bash" -c "cat <<EOF > /sentinel.conf
+    #   port 26379
+    #   dir /tmp
+    #   sentinel monitor redis-cache redis 6379 2
+    #   sentinel down-after-milliseconds redis-cache 5000
+    #   sentinel parallel-syncs redis-cache 1
+    #   sentinel failover-timeout redis-cache 5000
+    #   sentinel auth-pass redis-cache 7cBEcwf6mV36Rx3S
+    #   EOF"
+    #   "/bin/bash" -c "redis-sentinel /sentinel.conf"
+    #   EOF'
     deploy:
       replicas: 3
       restart_policy:
         condition: on-failure
       resources:
         limits:
-          memory: 512M
+          memory: 128M
     depends_on:
-      - master
-      - slave
+      - redis
     networks:
       - a2network
 
 networks:
   a2network:
+
+volumes:
+  redis-sentinel-volume:

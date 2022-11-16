@@ -1,13 +1,12 @@
 #!/usr/bin/python3
 import time
 import logging
+import os
 from cassandra.cluster import Cluster
 from redis import Redis, RedisError
+from redis.sentinel import Sentinel
 
-insert_statement = "INSERT INTO urlmap (short, long) VALUES (%s, %s);"
-
-# redis_host = os.environ['REDIS_HOST']
-# cassandra_cluster = [h.strip() for h in os.environ['CASSANDRA_CLUSTER'].split(',')]
+insert_query = "INSERT INTO urlmap (short, long) VALUES (%s, %s);"
 
 redis_sentinel = [(s.strip(), 26379) for s in os.environ['REDIS_SENTINEL'].split(',')]
 cassandra_cluster = [h.strip() for h in os.environ['CASSANDRA_CLUSTER'].split(',')]
@@ -31,7 +30,7 @@ while True:
         
         if longResource:
             longResource = longResource.decode('utf-8')
-            session.execute(insert_statement, [shortResource, longResource])
+            session.execute(insert_query, [shortResource, longResource])
             logging.debug(msg="Inserted shortResource: " + shortResource + ", longResource: " + longResource)
             
     except KeyboardInterrupt:
