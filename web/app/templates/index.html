@@ -16,6 +16,7 @@
             window.location.href = short;
             e.preventDefault();
         });
+        var t;
         $(document).on('submit', '.putForm', function(e) {
             $.ajax({
                 url: '/?'+ $(this).serialize(),
@@ -25,7 +26,11 @@
                     $('#put_result').text("success");
                 },
                 error: function(res) {
+                    clearTimeout(t)
                     $('#put_result').text(res.statusText);
+                    t = setTimeout(() => {
+                        $('#put_result').text('');
+                    }, 5000)
                 }, 
             });
             e.preventDefault();

@@ -13,7 +13,9 @@ services:
       #   constraints: [node.role == manager]
     environment:
       - REDIS_SENTINEL=redis-sentinel
-      - CASSANDRA_CLUSTER=10.11.1.114,10.11.1.115,10.11.1.23
+      - CASSANDRA_CLUSTER=${CASSANDRA_CLUSTER}
+    volumes:
+      - /home/student/CSC409A2/web/logs/log.txt:/data/log.txt
     depends_on:
       - redis
     networks:
@@ -30,7 +32,7 @@ services:
       #   constraints: [node.role == manager]
     environment:
       - REDIS_SENTINEL=redis-sentinel
-      - CASSANDRA_CLUSTER=10.11.1.114,10.11.1.115,10.11.1.23
+      - CASSANDRA_CLUSTER=${CASSANDRA_CLUSTER}
     depends_on:
       - redis
     networks:
@@ -44,9 +46,7 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
     volumes:
       - /home/student/CSC409A2/redis:/data
-      - /home/student/redis/overrides.conf:/opt/bitnami/redis/mounted-etc/overrides.conf
       - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
-      # - /home/student/redis/overrides.conf:/overrides.conf
     deploy:
       replicas: 1
       restart_policy:
@@ -85,7 +85,7 @@ services:
     #   - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --replicaof redis 6379 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
     command: |
       sh -c '\
-      redis-server \
+      redis-server /opt/bitnami/redis/mounted-etc/redis.conf \
       --slave-announce-ip $$(hostname -i) \
       --port 6379 \
       --slaveof redis 6379 \
@@ -101,7 +101,7 @@ services:
     # ports:
     #   - 26379:26379
     environment:
-      - REDIS_MASTER_HOST=10.11.1.114
+      - REDIS_MASTER_HOST=${MASTER_HOST}
       - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=10000
       - REDIS_SENTINEL_FAILOVER_TIMEOUT=20000
       - REDIS_SENTINEL_RESOLVE_HOSTNAMES=yes

@@ -7,7 +7,8 @@ import os, sys
 import logging
 
 app = Flask(__name__)
-app.logger.addHandler(logging.StreamHandler(sys.stdout))
+app.logger.basicConfig(filename='/data/log.txt')
+# app.logger.addHandler(logging.StreamHandler(sys.stdout))
 app.logger.setLevel(int(os.environ['LOGGING_LEVEL']))
 
 redis_sentinel = [(s.strip(), 26379) for s in os.environ['REDIS_SENTINEL'].split(',')]
