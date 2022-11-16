@@ -52,7 +52,7 @@ services:
     image: redis
     container_name: redis-slave
     ports:
-      - 6380:6379
+      - 6380:6380
     deploy:
       replicas: 2
       placement:
@@ -60,12 +60,14 @@ services:
       resources:
         limits:
           memory: 128M
+      restart_policy:
+        condition: on-failure
     volumes:
       - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
     command: 
       - bash
       - -c
-      - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --slaveof master 6379 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
+      - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --port 6380 --replica-announce-port 6380 --replicaof master 6379 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
     depends_on:
       - master
     networks:
@@ -73,11 +75,15 @@ services:
 
   redis-sentinel:
     image: 'bitnami/redis-sentinel:latest'
+    ports:
+      - 26379:26379
     environment:
       - REDIS_MASTER_HOST=10.11.1.114
-      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=50000
-      - REDIS_SENTINEL_FAILOVER_TIMEOUT=200000
+      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=5000
+      - REDIS_SENTINEL_FAILOVER_TIMEOUT=20000
       - REDIS_SENTINEL_RESOLVE_HOSTNAMES=yes
+      # - REDIS_SENTINEL_ANNOUNCE_IP=10.11.1.114
+      - REDIS_SENTINEL_ANNOUNCE_PORT=6380
     deploy:
       replicas: 3
       restart_policy:
@@ -88,8 +94,6 @@ services:
     depends_on:
       - master
       - slave
-    links:
-      - master:master
     networks:
       - a2network
 
