@@ -81,20 +81,21 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
     volumes:
       - /home/student/CSC409A2/redis:/data
-      - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
+      # - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
       resources:
         limits:
-          memory: 128M
+          memory: 512M
       placement:
         constraints: [node.role == manager]
     command: 
       - bash
       - -c
-      - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
+      # - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
+      - redis-server --bind 0.0.0.0 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random
     networks:
       - a2network
 
@@ -118,14 +119,15 @@ services:
           memory: 128M
       restart_policy:
         condition: on-failure
-    volumes:
-      - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
+      # volumes:
+          # - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
     command: |
       sh -c '\
       redis-server /opt/bitnami/redis/mounted-etc/redis.conf \
       --slave-announce-ip $$(hostname -i) \
       --port 6379 \
       --slaveof redis 6379 \
+      --bind 0.0.0.0
       --maxmemory-policy allkeys-random \
       ';
     depends_on:
