@@ -1,0 +1,4 @@
+Flask
+Redis
+cassandra-driver
+gunicorn

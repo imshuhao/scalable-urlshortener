@@ -3,7 +3,7 @@ import time
 import logging
 import os
 from cassandra.cluster import Cluster
-from redis import Redis, RedisError
+from redis import RedisError
 from redis.sentinel import Sentinel
 
 insert_query = "INSERT INTO urlmap (short, long) VALUES (%s, %s);"
@@ -22,17 +22,17 @@ while True:
     try:
         shortResource = sentinel.master_for("mymaster", socket_timeout=2).blpop(keys=['queue'], timeout=0)
         shortResource = shortResource[1].decode('utf-8')
-        
+
         logging.debug(msg="Received shortResource: " + shortResource)
-        
+
         longResource = sentinel.slave_for("mymaster", socket_timeout=2).get(shortResource)
         logging.debug(msg="Retrieved longResource: " + longResource.decode('utf-8'))
-        
+
         if longResource:
             longResource = longResource.decode('utf-8')
             session.execute(insert_query, [shortResource, longResource])
             logging.debug(msg="Inserted shortResource: " + shortResource + ", longResource: " + longResource)
-            
+
     except KeyboardInterrupt:
         logging.debug(msg="KeyboardInterrupt")
         session.shutdown()
