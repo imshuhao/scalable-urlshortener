@@ -93,7 +93,7 @@ gets replicated, data could be lost.
 - Testing scripts: writeTest.py
 
 
-### 0/14 Discussion of each of the following with respect to your system.
+### Discussion of each of the following with respect to your system.
 - For each point, as appropriate, show an appropriate diagram, list performance guarantees, discuss code/architecture choices.
 - Example:
 	- Availability:
@@ -122,13 +122,15 @@ gets replicated, data could be lost.
 	- In this application writes to cassandra are queued and a writer wakes up periodically to 
 	perform writes to cassandra. This improves write throughput at a cost of consistancy.
 - [0] 1 Process disaster recovery
-	- Docker will automatically restart any failing container.
+	- Docker will automatically restart any failing container, ensuring availability.
 	- In case of a redis master going down, redis sentinels will re-elect master to ensure that write requests can still be performed.
 - [0] 1 Data disaster recovery
 	- Both redis and cassandra servers are data persistant by storing data on a mounted disk in container.
+	This means if the program crashes, we can still recover from disk.
+	Cassandra is in a cassandra cluster, which means data will be replicated across all cassandra servers.
+	If one cassandra nodes lost its data, data could still be recovered from other nodes in the cluster.
 - [0] 1 Orchestration
-	- We have a script that automatically starts and stops all services, including cassandra cluster, docker
-	swarm and services on stack.
+	- We have a script that automatically starts, stops, and manages all services, including cassandra cluster, docker swarm and services on stack.
 - [0] 1 Healthcheck
 	- The health checker will periodically pings the services to check if they are down, by translating docker
 	built in health check feature to user-friendly web interface.
@@ -164,13 +166,21 @@ gets replicated, data could be lost.
 		- redis replicas can sync with its master faster, as data is transferred and processed faster.
 		- redis sentinels can also re-elect masters faster, because it can evaulate replicas for master
 		eligibility faster.
-	- RAM benefit: Mainly redis having larger memory
-	- Disk benefit: URLShortner and central DB will have larger capacity in database storage,
-	storing more data.
-- [0] 1 Well formatted document
-	- :D
+	- RAM benefit: 
+		- More throughput: redis having larger memory means more data can be cached. Less requests need to
+		contact cassandra,, and redis can answer for more requests, where data is fetched faster
+		than in cassandra because of fast memory reads/writes compared to disk IO.
+		Redis can also fetch from and write to memory faster, if memory hardware is upgraded.
+		- More services: we can run more services on each machine, as each service takes up some memory,
+		more memory means more service capacity for each individual machine.
+	- Disk benefit
+		- Cassandra benefits from this by reading and writing to disk faster. As a result the application
+		will experience increased throughput because requests that need to be read or written to cassandra
+		takes less time to complete.
+		- Additional disk space means we can store more data on disks for cassandra. Also Redis will have a 
+		large persistent capacity.
 
-### 0/4 Discussing the system's performance
+### Discussing the system's performance
 
 - [0] 1 Graph showing performance of system under load1
 
