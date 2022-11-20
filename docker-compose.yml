@@ -1,7 +1,6 @@
 version: "3.8"
 services:
   web:
-    #image: imshuhao/a2web:latest
     image: imshuhao/a2web:latest
     ports:
       - "80:80"
@@ -11,47 +10,17 @@ services:
         max_replicas_per_node: 1
       restart_policy:
         condition: on-failure
-      # placement:
-      #   constraints: [node.role == manager]
     environment:
       - REDIS_SENTINEL=redis-sentinel
-      - CASSANDRA_CLUSTER=${CASSANDRA_CLUSTER}
-    healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost || exit 1
-      interval: 5s
-      retries: 1
-      start_period: 20s
-      timeout: 3s
+      - CASSANDRA_CLUSTER=${CASSANDRA_CLUSTER:?err}
     volumes:
-      - a2web_volume:/data
+      - a2logs:/data
     depends_on:
       - redis
     networks:
       - a2network
 
-  visualizer:
-    image: dockersamples/visualizer:stable
-    ports:
-      - "8080:8080"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-    deploy:
-      placement:
-        constraints: [node.role == manager]
-    networks:
-      - a2network
-
-  healthchecker:
-    image: healthchecker
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-    networks:
-      - a2network
-
   writer:
-    #image: imshuhao/a2writer:latest
     image: imshuhao/a2writer:latest
     deploy:
       replicas: 1
@@ -61,7 +30,9 @@ services:
       #   constraints: [node.role == manager]
     environment:
       - REDIS_SENTINEL=redis-sentinel
-      - CASSANDRA_CLUSTER=${CASSANDRA_CLUSTER}
+      - CASSANDRA_CLUSTER=${CASSANDRA_CLUSTER:?err}
+    volumes:
+      - a2logs:/data
     depends_on:
       - redis
     networks:
@@ -72,16 +43,15 @@ services:
     ports:
       - "6379:6379"
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
-      interval: 5s
-      retries: 1
-      start_period: 20s
-      timeout: 3s
+      test: ["CMD", "redis-cli", "ping"]
+      # interval: 5s
+      # retries: 1
+      # start_period: 20s
+      # timeout: 3s
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     volumes:
-      - /home/student/CSC409A2/redis:/data
-      # - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
+      - /home/student/redis:/data
     deploy:
       replicas: 1
       restart_policy:
@@ -94,7 +64,6 @@ services:
     command: 
       - bash
       - -c
-      # - redis-server /opt/bitnami/redis/mounted-etc/redis.conf --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random # --appendonly yes
       - redis-server --bind 0.0.0.0 --maxmemory $$(( $$( cat /sys/fs/cgroup/memory/memory.limit_in_bytes ) - 100000000)) --maxmemory-policy allkeys-random
     networks:
       - a2network
@@ -104,11 +73,11 @@ services:
     ports:
       - 6379
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 5s
-      retries: 1
-      start_period: 20s
-      timeout: 3s
+      test: ["CMD", "redis-cli", "ping"]
+      # interval: 5s
+      # retries: 1
+      # start_period: 20s
+      # timeout: 3s
     deploy:
       replicas: 2
       placement:
@@ -119,11 +88,9 @@ services:
           memory: 128M
       restart_policy:
         condition: on-failure
-      # volumes:
-          # - /home/student/redis/redis.conf:/opt/bitnami/redis/mounted-etc/redis.conf
     command: |
       sh -c '\
-      redis-server /opt/bitnami/redis/mounted-etc/redis.conf \
+      redis-server \
       --slave-announce-ip $$(hostname -i) \
       --port 6379 \
       --slaveof redis 6379 \
@@ -139,8 +106,14 @@ services:
     image: 'bitnami/redis-sentinel:latest'
     # ports:
     #   - 26379:26379
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      # interval: 5s
+      # retries: 3
+      # start_period: 30s
+      # timeout: 30s
     environment:
-      - REDIS_MASTER_HOST=${MASTER_HOST}
+      - REDIS_MASTER_HOST=${MASTER_HOST:?err}
       - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=10000
       - REDIS_SENTINEL_FAILOVER_TIMEOUT=20000
       - REDIS_SENTINEL_RESOLVE_HOSTNAMES=yes
@@ -158,9 +131,44 @@ services:
     networks:
       - a2network
 
+  # visualizer:
+  #   image: dockersamples/visualizer:stable
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - "/var/run/docker.sock:/var/run/docker.sock"
+  #   deploy:
+  #     placement:
+  #       constraints: [node.role == manager]
+  #   networks:
+  #     - a2network
+
+  visualizer:
+    image: moimhossain/viswarm:latest
+    ports:
+      - "9009:9009"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - a2network
+
+  # healthchecker:
+  #   image: healthchecker
+  #   deploy:
+  #     replicas: 1
+  #     restart_policy:
+  #       condition: on-failure
+  #   volumes:
+  #     - "/var/run/docker.sock:/var/run/docker.sock"
+  #   networks:
+  #     - a2network
+
+
 networks:
   a2network:
 
 volumes:
-  redis-sentinel-volume:
-  a2web_volume:
+  a2logs:

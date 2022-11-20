@@ -1,0 +1,4 @@
+#!/bin/bash
+
+docker build -t imshuhao/a2writer:latest .
+docker push imshuhao/a2writer:latest

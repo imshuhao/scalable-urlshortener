@@ -7,17 +7,22 @@ import os
 import logging
 
 app = Flask(__name__)
+if not os.path.exists("/data"):
+    os.makedirs("/data")
+
 app.logger.addHandler(logging.FileHandler("/data/web.log"))
 app.logger.setLevel(int(os.environ['LOGGING_LEVEL']))
 
 redis_sentinel = [(s.strip(), 26379) for s in os.environ['REDIS_SENTINEL'].split(',')]
 cassandra_cluster = [h.strip() for h in os.environ['CASSANDRA_CLUSTER'].split(',')]
 
+app.logger.debug(f"redis_sentinel: {redis_sentinel}")
+app.logger.debug(f"cassandra_cluster: {cassandra_cluster}")
+
 cluster = Cluster(cassandra_cluster)
 session = cluster.connect('urlmap')
 
 sentinel = Sentinel(redis_sentinel, socket_timeout=2)
-app.logger.debug(sentinel.master_for("mymaster", socket_timeout=2))
 
 select_query = "SELECT long FROM urlmap WHERE short = %s;"
 insert_query = "INSERT INTO urlmap (short, long) VALUES (%s, %s);"
