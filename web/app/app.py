@@ -64,7 +64,7 @@ def getResource(shortResource):
         except RedisError:
             app.logger.debug("Error: cannot set value to Redis")
     if not longResource:
-        return "Not Found", 404
+        return "page not found", 404
     return redirect(longResource, code=307)
 
 
