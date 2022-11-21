@@ -1,60 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
+<meta http-equiv="refresh" content="5">
 <head>
-    <style> 
-    div {
-        padding-right: 30px;
-        padding-bottom: 50px;
-        padding-left: 80px;
-        display: grid;
-        justify-content: center;
-    }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
-    <script >
-        $(document).on('submit', '.getForm', function(e) {
-            let short = $("#shortval").val();
-            window.location.href = short;
-            e.preventDefault();
-        });
-        var t;
-        $(document).on('submit', '.putForm', function(e) {
-            $.ajax({
-                url: '/?'+ $(this).serialize(),
-                type: "PUT",
-                data: $(this).serialize(),
-                success: function(html) {
-                    $('#put_result').text("success");
-                },
-                error: function(res) {
-                    clearTimeout(t)
-                    $('#put_result').text(res.statusText);
-                    t = setTimeout(() => {
-                        $('#put_result').text('');
-                    }, 5000)
-                }, 
-            });
-            e.preventDefault();
-        });
-    </script>
+    <title>URLShortener Status</title>
 </head>
-<html>
-    <body>
-        <center><h1>Redirect Me</h1></center>
-        <div>
-            <h2>GET Request</h2>
-            <form class="getForm">
-                <input id="shortval" name="shortval" type="text" size="30"></input>
-                <Button type="submit">Jump</Button>
-            </form><br />
-            <h2>PUT Request</h2>
-            <form class="putForm">
-                <label for="short">Short</label>
-                <input id="short" name="short" type="text" size="50" style="margin-bottom: 10px"></input>
-                <br><label for="long">Long</label>
-                <input id="long" name="long" type="text" size="100"></input>
-                <Button type="submit">Put</Button>
-            </form>
-            <textarea id="put_result" rows="4" cols="80" readonly></textarea>
-        </div>
-    </body>
-</html>
+<body>
+    <h1>URLShortener Status</h1>
+    <div>
+    {% for k, v in status.items() %}
+    <h2>{{ k }}</h2>
+    <table>
+        <tr>
+            <th>Image</th>
+            <th>State</th>
+            <th>Message</th>
+        </tr>
+        {% for image, state, message in v %}
+        <tr>
+            <th>{{ image }}</th>
+            <th>{{ state }}</th>
+            <th>{{ message }}</th>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endfor %}
+    </div>
+</body>

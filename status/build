@@ -1,0 +1,3 @@
+#!/bin/bash
+docker build -t imshuhao/a2status:latest .
+docker push imshuhao/a2status:latest

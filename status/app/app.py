@@ -1,31 +1,45 @@
 #!/usr/bin/python3
-from cassandra.cluster import Cluster
-from redis import Redis, RedisError
-from redis.sentinel import Sentinel
-from flask import Flask, request, redirect, render_template
 import os, sys
-import logging
+import docker
+import threading, time
+from flask import Flask, render_template
 
-app = Flask(__name__)
-app.logger.addHandler(logging.FileHandler("/data/web.log"))
-app.logger.setLevel(int(os.environ['LOGGING_LEVEL']))
+client = docker.from_env()
+APIClient = docker.APIClient(base_url='unix://var/run/docker.sock')
 
-redis_sentinel = [(s.strip(), 26379) for s in os.environ['REDIS_SENTINEL'].split(',')]
-cassandra_cluster = [h.strip() for h in os.environ['CASSANDRA_CLUSTER'].split(',')]
+def status():
+    res = {}
+    tasks = APIClient.tasks()
+    for task in tasks:
+        spec = task['Spec']
+        status = task['Status']
+        NodeID = task['NodeID']
+        image = spec['ContainerSpec']['Image'].split('@')[0]
+        state, message = status['State'], status['Message']
+        node_name = client.nodes.get(NodeID).attrs['Description']['Hostname']
+        # print(node_name, image, state, message)
+        res.setdefault(node_name, []).append((image, state, message))
+    for k in res:
+        res[k].sort(key=lambda x: x[0])
+    return res
 
-cluster = Cluster(cassandra_cluster)
-session = cluster.connect('urlmap')
 
-sentinel = Sentinel(redis_sentinel, socket_timeout=2)
-app.logger.debug(sentinel.master_for("mymaster", socket_timeout=2))
+app = Flask(
+    __name__,
+    template_folder='templates',
+)
 
-select_query = "SELECT long FROM urlmap WHERE short = %s;"
-insert_query = "INSERT INTO urlmap (short, long) VALUES (%s, %s);"
+@app.get('/')
+def page():
+    return render_template('index.html', status=status())
 
+@app.get('/ping')
+def ping():
+    return 'pong', 200
 
-@app.route("/", methods=['GET'])
-def index():
-	return render_template('index.html')
-
-if __name__ == "__main__":
-	app.run(host='0.0.0.0', port=8088)
+if __name__ == '__main__':
+    app.run(
+	    host='0.0.0.0',
+	    debug=False,
+	    port=8888
+    )

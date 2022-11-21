@@ -1,4 +1,3 @@
 #!/bin/bash
-
 docker build -t imshuhao/a2web:latest .
 docker push imshuhao/a2web:latest

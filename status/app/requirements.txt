@@ -1,4 +1,3 @@
 Flask
-Redis
-cassandra-driver
+docker
 gunicorn

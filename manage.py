@@ -73,9 +73,10 @@ def show_stack():
     subprocess.run(["docker", "stack", "ps", "a2"])
 
 def purge_db():
-    subprocess.run(["ssh", f"student@{DOCKER_MANAGER}", "sudo rm -rf /home/student/cassandra/*"])
+    subprocess.run(["ssh", f"student@{DOCKER_MANAGER}", "echo uoftnmsl | sudo -S rm -rf /home/student/cassandra/*"])
     for host in DOCKER_HOSTS:
-        subprocess.run(["ssh", f"student@{host}", "sudo rm -rf /home/student/cassandra/*"])
+        subprocess.run(["ssh", f"student@{host}", "echo uoftnmsl | sudo -S rm -rf /home/student/cassandra/*"])
+    print('')
 
 def read_command():
     try:

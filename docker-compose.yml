@@ -143,28 +143,20 @@ services:
   #   networks:
   #     - a2network
 
-  visualizer:
-    image: moimhossain/viswarm:latest
+  status:
+    image: imshuhao/a2status:latest
     ports:
-      - "9009:9009"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "8888:8888"
     deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
       placement:
         constraints: [node.role == manager]
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
     networks:
       - a2network
-
-  # healthchecker:
-  #   image: healthchecker
-  #   deploy:
-  #     replicas: 1
-  #     restart_policy:
-  #       condition: on-failure
-  #   volumes:
-  #     - "/var/run/docker.sock:/var/run/docker.sock"
-  #   networks:
-  #     - a2network
 
 
 networks:
